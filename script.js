@@ -3000,23 +3000,53 @@ async function getGeminiResponse(message) {
     }
   };
 
-  // Add timeout for Gemini API call
-  const { signal, cleanup } = createAPITimeoutController();
-  
-  const response = await fetch(GEMINI_WORKER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody),
-    signal
-  });
-  
-  cleanup();
+  // Retry temporary Cloudflare/Gemini availability errors with backoff.
+  // The API key remains protected in the Cloudflare Worker.
+  const maxAttempts = 3;
+  let response = null;
+  let lastErrorText = '';
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { signal, cleanup } = createAPITimeoutController();
+
+    try {
+      response = await fetch(GEMINI_WORKER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
+        signal
+      });
+    } catch (error) {
+      lastErrorText = error && error.message ? error.message : String(error);
+      if (attempt === maxAttempts) {
+        throw new Error('No se pudo conectar con el servicio de IA después de 3 intentos. ' + lastErrorText);
+      }
+      await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+      continue;
+    } finally {
+      cleanup();
+    }
+
+    if (response.ok) break;
+
+    lastErrorText = await response.text();
+    const temporaryError = [408, 425, 429, 500, 502, 503, 504].includes(response.status);
+
+    if (!temporaryError || attempt === maxAttempts) {
+      if (response.status === 503 || response.status === 429) {
+        throw new Error('Gemini está temporalmente saturado. Se realizaron 3 intentos sin éxito. Espera unos segundos y vuelve a intentarlo.');
+      }
+      throw new Error(`Gemini API error: ${response.status} - ${lastErrorText}`);
+    }
+
+    console.warn(`Gemini temporal error ${response.status}. Retry ${attempt + 1}/${maxAttempts}...`);
+    await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+  }
+
+  if (!response || !response.ok) {
+    throw new Error('El servicio de IA no está disponible temporalmente. Inténtalo de nuevo.');
   }
 
   const data = await response.json();
