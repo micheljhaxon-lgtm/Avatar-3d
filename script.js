@@ -1844,9 +1844,11 @@ let openaiConfig = {
   system_message: ''
 };
 
+const GEMINI_WORKER_URL = 'https://empty-surf-94b6.micheljhaxon.workers.dev/';
+
 let geminiConfig = {
   key: '',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   temperature: 0.7,
   max_output_tokens: 1024,
   top_p: 0.95,
@@ -2968,26 +2970,10 @@ async function getOpenAIResponse(message) {
 }
 
 async function getGeminiResponse(message) {
-  if (!geminiConfig.key) {
-    throw new Error('No Gemini API key provided');
-  }
-
   const systemInstruction = geminiConfig.system_instruction || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.';
   
   // Build conversation history for Gemini format
   const contents = [];
-  
-  // Add system instruction as first user message if we have no history
-  if (conversationHistory.length === 0) {
-    contents.push({
-      role: 'user',
-      parts: [{ text: systemInstruction }]
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I understand. I will follow those instructions in our conversation.' }]
-    });
-  }
   
   // Add conversation history - properly convert roles for Gemini
   conversationHistory.forEach(msg => {
@@ -3006,22 +2992,21 @@ async function getGeminiResponse(message) {
 
   const requestBody = {
     contents: contents,
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
     generationConfig: {
-      temperature: geminiConfig.temperature,
-      topK: geminiConfig.top_k,
-      topP: geminiConfig.top_p,
-      maxOutputTokens: geminiConfig.max_output_tokens
+      maxOutputTokens: geminiConfig.max_output_tokens || 1024
     }
   };
 
   // Add timeout for Gemini API call
   const { signal, cleanup } = createAPITimeoutController();
   
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiConfig.model}:generateContent`, {
+  const response = await fetch(GEMINI_WORKER_URL, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'X-goog-api-key': geminiConfig.key
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(requestBody),
     signal
@@ -3657,8 +3642,7 @@ function loadUISettings() {
     if (document.getElementById('openaiPresencePenalty')) document.getElementById('openaiPresencePenalty').value = openaiConfig.presence_penalty || 0;
     
     // Update Gemini UI elements
-    if (document.getElementById('geminiKey')) document.getElementById('geminiKey').value = geminiConfig.key || '';
-    if (document.getElementById('geminiModel')) document.getElementById('geminiModel').value = geminiConfig.model || 'gemini-2.5-flash';
+    if (document.getElementById('geminiModel')) document.getElementById('geminiModel').value = geminiConfig.model || 'gemini-3.8-flash';
     if (document.getElementById('geminiTemperature')) document.getElementById('geminiTemperature').value = geminiConfig.temperature || 0.7;
     if (document.getElementById('geminiMaxTokens')) document.getElementById('geminiMaxTokens').value = geminiConfig.max_output_tokens || 1024;
     if (document.getElementById('geminiTopP')) document.getElementById('geminiTopP').value = geminiConfig.top_p || 0.95;
@@ -3816,7 +3800,6 @@ function updateOpenAIConfig() {
 }
 
 function updateGeminiConfig() {
-  geminiConfig.key = document.getElementById('geminiKey').value;
   geminiConfig.model = document.getElementById('geminiModel').value;
   geminiConfig.temperature = parseFloat(document.getElementById('geminiTemperature').value);
   geminiConfig.max_output_tokens = parseInt(document.getElementById('geminiMaxTokens').value);
