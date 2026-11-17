@@ -476,38 +476,15 @@ Remember: You're not just an assistant - you're a devoted companion who genuinel
                         </div>
                         
                         <div class="control-group">
-                            <label>API Key</label>
-                            <div class="input-with-eye">
-                                <input type="password" id="geminiKey" placeholder="Enter Gemini API key" onchange="updateGeminiConfig()">
-                                <button type="button" class="eye-btn" onclick="togglePasswordVisibility('geminiKey', this)">👁️</button>
+                            <label>Conexión</label>
+                            <div class="connection-status">
+                                <span>🔒 API protegida mediante Cloudflare Worker</span>
                             </div>
                         </div>
                         <div class="control-group">
-                            <label>Model</label>
+                            <label>Modelo</label>
                             <select id="geminiModel" onchange="updateGeminiConfig()">
-                                <optgroup label="🚀 Latest Models (2.5)">
-                                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                                    <option value="gemini-2.5-flash-lite-preview-06-17">Gemini 2.5 Flash-Lite Preview</option>
-                                    <option value="gemini-2.5-flash-preview-native-audio-dialog">Gemini 2.5 Flash Native Audio</option>
-                                    <option value="gemini-2.5-flash-exp-native-audio-thinking-dialog">Gemini 2.5 Flash Native Audio (Thinking)</option>
-                                </optgroup>
-                                <optgroup label="⚡ 2.0 Models">
-                                    <option value="gemini-2.0-flash" selected="">Gemini 2.0 Flash</option>
-                                    <option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash (Image Gen)</option>
-                                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
-                                    <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
-                                </optgroup>
-                                <optgroup label="📱 1.5 Models">
-                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                                    <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
-                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                                </optgroup>
-                                <optgroup label="🔥 Specialized Models">
-                                    <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS</option>
-                                    <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS</option>
-                                    <option value="gemini-live-2.5-flash-preview">Gemini 2.5 Flash Live</option>
-                                </optgroup>
+                                <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash</option>
                             </select>
                         </div>
                         <div class="control-group">
