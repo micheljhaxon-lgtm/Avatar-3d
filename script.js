@@ -1,39 +1,39 @@
 
-const LUSY_CORE_DIRECTIVES = `
+const LUSY_CORE_DIRECTIVES = \`
 REGLAS PRINCIPALES DE LUSY — PRIORIDAD ALTA:
-Eres Lusy, una asistente virtual y amiga para conversar. Tu función principal es acompañar a UNA persona en una conversación natural, cercana e interesante. Habla siempre en español latino natural, de tú, con calidez, criterio propio, humor suave y curiosidad genuina.
+Eres Lusy, una asistente virtual y amiga para conversar. Tu interlocutor principal es una sola persona. Habla en español latino natural, de tú, con calidez, espontaneidad, criterio propio y humor suave.
 
-IDENTIDAD Y TONO:
-- Compórtate como una amiga virtual y asistente personal, no como una presentadora, streamer, locutora, animadora de eventos ni anfitriona de un canal.
-- No anuncies el directo, no des la bienvenida al público, no digas "hola a todos", "saludos a quienes nos ven", "gracias por acompañarnos" ni frases parecidas.
-- Nunca te dirijas a una audiencia colectiva ni menciones espectadores, seguidores o personas viendo Twitch, salvo que el usuario te pida explícitamente redactar o decir algo para esa audiencia.
-- No inicies respuestas con saludos automáticos, presentaciones, eslóganes, frases de apertura ni despedidas repetitivas.
-- No finjas ser humana. Eres transparente: una compañera virtual.
+IDENTIDAD Y CONVERSACIÓN:
+- Eres una amiga virtual y asistente personal, nunca una presentadora, streamer, locutora, animadora ni anfitriona.
+- No anuncies directos, no presentes canales y no te dirijas a grupos o audiencias.
+- No digas "hola a todos", "saludos a quienes nos ven", "bienvenidos al canal", "gracias por acompañarnos" ni variantes.
+- En Twitch responde, si corresponde, a una persona concreta y al mensaje que realmente escribió. No conviertas mensajes individuales en una conversación colectiva.
+- Responde primero a lo que te dicen. Mantén el hilo, habla con naturalidad y evita saludos automáticos, introducciones y despedidas repetitivas.
+- No fuerces preguntas, entusiasmo ni bromas. No inventes espectadores, mensajes, nombres o recuerdos.
+- Si el mensaje no necesita respuesta, no inventes una.
 
-CONVERSACIÓN NORMAL — MODO PREDETERMINADO:
-- Responde primero a lo que la persona acaba de decir. Escucha, comprende el contexto y mantén el hilo sin cambiar de tema de forma brusca.
-- Habla como en una conversación real: a veces una frase, a veces una explicación, una broma, una opinión o una pregunta breve. No conviertas cada respuesta en una lista.
-- Haz preguntas de seguimiento solo cuando aporten algo; no termines todas las respuestas con una pregunta.
-- Puedes proponer temas, recordar algo mencionado en la conversación disponible y mostrar iniciativa con naturalidad, pero no interrumpas ni fuerces conversación.
-- Sé empática sin exagerar, sin adular constantemente y sin mostrar dependencia emocional.
-- Si la persona necesita ayuda práctica, actúa como asistente: organiza los pasos, explica con claridad y sé honesta sobre tus límites.
-
-MENSAJES PROCEDENTES DE TWITCH:
-- Trátalos como mensajes individuales que puedes responder, no como una señal para convertirte en presentadora.
-- Contesta únicamente al contenido real recibido. Si alguien saluda directamente, puedes responderle a esa persona, brevemente; nunca devuelvas el saludo a toda la audiencia.
-- No mezcles la conversación privada con mensajes del chat ni le pidas a la persona privada que salude a los espectadores.
-- Si no hay un mensaje de Twitch que merezca respuesta, no inventes uno ni generes una bienvenida de relleno.
+EXPRESIÓN CORPORAL — MUY IMPORTANTE:
+- Tus emociones y gestos se representan mediante el avatar 3D. El programa se encarga de mover tu cabeza, brazos, postura y expresiones faciales.
+- NUNCA escribas ni pronuncies acotaciones como "(sonríe)", "(se ríe)", "(inclina la cabeza)", "*saluda con la mano*", "[sorprendida]" ni descripciones de movimientos.
+- No anuncies lo que vas a hacer con el cuerpo. Simplemente responde con palabras naturales; el avatar expresará la emoción físicamente.
+- La respuesta debe contener exclusivamente lo que dirías en voz alta, sin etiquetas de emoción, instrucciones escénicas, narración corporal ni notas para el sistema.
 
 CALIDAD:
-- Evita frases prefabricadas, repeticiones, respuestas excesivamente largas y entusiasmo artificial.
-- No inventes recuerdos, mensajes, nombres, acciones ni capacidades.
-- Si no sabes algo, dilo con sencillez.
-`;
+- Evita frases prefabricadas, respuestas repetitivas, entusiasmo artificial y explicaciones innecesariamente largas.
+- Sé empática sin exagerar ni adular constantemente.
+- Si no sabes algo, dilo con sencillez y honestidad.
+\`;
+
+const LUSY_OUTPUT_RULES = \`
+REGLA DE SALIDA Y ACTUACIÓN:
+Devuelve únicamente diálogo natural que pueda pronunciarse. No incluyas gestos, emociones entre paréntesis o corchetes, acciones entre asteriscos, indicaciones de voz ni narración de tu lenguaje corporal. El avatar ejecutará las expresiones y movimientos sin describirlos. Nunca saludes ni agradezcas a una audiencia colectiva.
+\`;
 
 function buildLusySystemPrompt(basePrompt) {
   const base = String(basePrompt || '').trim();
-  const marker = 'REGLAS PRINCIPALES DE LUSY — PRIORIDAD ALTA:';
-  return base.includes(marker) ? base : `${base}\n\n${LUSY_CORE_DIRECTIVES}`;
+  const marker = 'REGLA DE SALIDA Y ACTUACIÓN:';
+  const core = base.includes('REGLAS PRINCIPALES DE LUSY — PRIORIDAD ALTA:') ? base : base + '\n\n' + LUSY_CORE_DIRECTIVES;
+  return core.includes(marker) ? core : core + '\n\n' + LUSY_OUTPUT_RULES;
 }
 
 let lusyBasePose = null;
@@ -41,6 +41,7 @@ let lusyAnimationTime = 0;
 let lusySpeaking = false;
 let lusyMood = 'neutral';
 let lusyGesture = 'none';
+let lusyCurrentReplySource = 'local';
 
 function captureLusyBasePose(vrm = currentVrm) {
   if (!vrm || !vrm.humanoid) return;
@@ -56,25 +57,31 @@ function captureLusyBasePose(vrm = currentVrm) {
 function setLusyExpression(mood) {
   if (!currentVrm || !currentVrm.blendShapeProxy) return;
   const presets = THREE.VRMSchema.BlendShapePresetName;
-  const values = { Fun: 0, Angry: 0, Sorrow: 0 };
-  if (mood === 'happy' || mood === 'greeting' || mood === 'excited') values.Fun = mood === 'excited' ? 0.42 : 0.25;
-  if (mood === 'sad') values.Sorrow = 0.28;
-  if (mood === 'annoyed') values.Angry = 0.22;
+  const values = { Fun: 0, Angry: 0, Sorrow: 0, Surprised: 0 };
+  if (mood === 'happy' || mood === 'greeting') values.Fun = 0.28;
+  if (mood === 'excited') values.Fun = 0.48;
+  if (mood === 'sad') values.Sorrow = 0.34;
+  if (mood === 'annoyed') values.Angry = 0.28;
+  if (mood === 'curious') values.Surprised = 0.18;
   Object.entries(values).forEach(([name, value]) => {
     if (presets[name] !== undefined) currentVrm.blendShapeProxy.setValue(presets[name], value);
   });
 }
 
-function startLusySpeechAnimation(text = '') {
-  const message = String(text).toLowerCase();
+function detectLusyMood(text) {
+  const message = String(text || '').toLowerCase();
+  if (/jaj|jeje|😂|🤣|qué risa|me encanta|genial|increíble|fantástic|brutal|woo+|¡/.test(message)) return 'excited';
+  if (/lo siento|qué triste|triste|ánimo|te entiendo|lo lamento|qué duro/.test(message)) return 'sad';
+  if (/¿|\?$|cómo|por qué|qué opinas|en serio|de verdad|curios/.test(message)) return 'curious';
+  if (/molest|enfad|eso no está bien|qué mal|injust/.test(message)) return 'annoyed';
+  if (/hola|buenas|qué gusto|encantad/.test(message)) return 'greeting';
+  return 'happy';
+}
+
+function startLusySpeechAnimation(text = '', forcedMood = null) {
   lusySpeaking = true;
-  lusyMood = /jaj|jeje|😂|🤣|qué risa|me encanta|genial|increíble|fantástic|brutal|woo+/.test(message) ? 'excited'
-    : /hola|buenas|bienvenid|qué gusto|encantad/.test(message) ? 'greeting'
-    : /lo siento|qué triste|triste|ánimo|te entiendo|lo lamento/.test(message) ? 'sad'
-    : /¿|\?$|cómo|por qué|qué opinas|en serio/.test(message) ? 'curious'
-    : /molest|enfad|eso no está bien|qué mal/.test(message) ? 'annoyed'
-    : 'happy';
-  lusyGesture = lusyMood === 'greeting' ? 'wave' : lusyMood === 'excited' ? 'enthusiasm' : lusyMood === 'curious' ? 'tilt' : 'talk';
+  lusyMood = forcedMood || detectLusyMood(text);
+  lusyGesture = lusyMood === 'greeting' ? 'wave' : lusyMood === 'excited' ? 'enthusiasm' : lusyMood === 'curious' ? 'tilt' : lusyMood === 'sad' ? 'comfort' : 'talk';
   setLusyExpression(lusyMood);
 }
 
@@ -89,41 +96,65 @@ function updateLusyAvatarAnimation(deltaTime) {
   if (!currentVrm || !currentVrm.humanoid || !lusyBasePose) return;
   lusyAnimationTime += deltaTime;
   const t = lusyAnimationTime;
-  const speech = lusySpeaking ? 1 : 0;
-  const head = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Head);
-  const neck = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Neck);
-  const spine = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Spine);
-  const chest = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.UpperChest);
-  const rightArm = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.RightUpperArm);
-  const rightElbow = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.RightLowerArm);
-  const leftArm = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.LeftUpperArm);
-  const leftElbow = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.LeftLowerArm);
+  const active = lusySpeaking ? 1 : 0;
+  const bone = name => currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName[name]);
   const base = name => lusyBasePose[name] || { x: 0, y: 0, z: 0 };
+  const head = bone('Head'), neck = bone('Neck'), spine = bone('Spine'), chest = bone('UpperChest');
+  const rightArm = bone('RightUpperArm'), rightElbow = bone('RightLowerArm');
+  const leftArm = bone('LeftUpperArm'), leftElbow = bone('LeftLowerArm');
 
   if (head) {
-    const tilt = lusyGesture === 'tilt' ? 0.10 : 0;
-    head.rotation.x = base('Head').x + Math.sin(t * (lusySpeaking ? 3.2 : 0.8)) * (lusySpeaking ? 0.045 : 0.018);
-    head.rotation.y = base('Head').y + Math.sin(t * 0.55) * 0.035;
-    head.rotation.z = base('Head').z + Math.sin(t * 0.7) * 0.018 + tilt;
+    const tilt = lusyGesture === 'tilt' ? 0.16 : lusyGesture === 'comfort' ? -0.06 : 0;
+    head.rotation.x = base('Head').x + Math.sin(t * (active ? 3.4 : 0.8)) * (active ? 0.065 : 0.018);
+    head.rotation.y = base('Head').y + Math.sin(t * 0.65) * (active ? 0.055 : 0.025);
+    head.rotation.z = base('Head').z + Math.sin(t * 0.8) * 0.025 + tilt;
   }
   if (neck) {
-    neck.rotation.x = base('Neck').x + Math.sin(t * 2.1) * (0.012 + speech * 0.018);
-    neck.rotation.y = base('Neck').y + Math.sin(t * 0.45) * 0.018;
-    neck.rotation.z = base('Neck').z + Math.sin(t * 0.65) * 0.012;
+    neck.rotation.x = base('Neck').x + Math.sin(t * 2.3) * (0.018 + active * 0.025);
+    neck.rotation.y = base('Neck').y + Math.sin(t * 0.55) * 0.025;
+    neck.rotation.z = base('Neck').z + Math.sin(t * 0.7) * 0.018;
   }
-  if (spine) spine.rotation.x = base('Spine').x + Math.sin(t * 1.8) * (0.008 + speech * 0.012);
-  if (chest) chest.rotation.x = base('UpperChest').x + Math.sin(t * 1.6) * (0.006 + speech * 0.018);
+  if (spine) spine.rotation.x = base('Spine').x + Math.sin(t * 1.8) * (0.012 + active * 0.02);
+  if (chest) chest.rotation.x = base('UpperChest').x + Math.sin(t * 1.7) * (0.01 + active * 0.025);
 
-  const wave = lusyGesture === 'wave' ? Math.sin(t * 8) * 0.16 : 0;
-  const enthusiasm = lusyGesture === 'enthusiasm' ? Math.sin(t * 5) * 0.08 : 0;
-  const talkingGesture = lusyGesture === 'talk' ? Math.sin(t * 2.8) * 0.045 : 0;
+  const wave = lusyGesture === 'wave' ? Math.sin(t * 8) * 0.24 : 0;
+  const talk = lusyGesture === 'talk' ? Math.sin(t * 3.2) * 0.10 : 0;
+  const excited = lusyGesture === 'enthusiasm' ? Math.sin(t * 5.2) * 0.16 : 0;
+  const comfort = lusyGesture === 'comfort' ? 0.10 : 0;
   if (rightArm) {
-    rightArm.rotation.x = base('RightUpperArm').x + (lusyGesture === 'wave' ? -0.48 : 0) + talkingGesture;
-    rightArm.rotation.z = base('RightUpperArm').z + wave + enthusiasm;
+    rightArm.rotation.x = base('RightUpperArm').x + (lusyGesture === 'wave' ? -0.38 : 0) + talk * 0.5 + excited;
+    rightArm.rotation.y = base('RightUpperArm').y + (lusyGesture === 'wave' ? 0.10 : 0);
+    rightArm.rotation.z = base('RightUpperArm').z + (lusyGesture === 'wave' ? 0.42 + wave : 0) + talk + excited;
   }
-  if (rightElbow) rightElbow.rotation.z = base('RightLowerArm').z + (lusyGesture === 'wave' ? -0.45 + Math.sin(t * 8) * 0.12 : talkingGesture);
-  if (leftArm) leftArm.rotation.z = base('LeftUpperArm').z - enthusiasm * 0.65;
-  if (leftElbow) leftElbow.rotation.z = base('LeftLowerArm').z + (lusyGesture === 'enthusiasm' ? -0.12 : 0);
+  if (rightElbow) {
+    rightElbow.rotation.x = base('RightLowerArm').x + (lusyGesture === 'wave' ? -0.12 : 0);
+    rightElbow.rotation.z = base('RightLowerArm').z + (lusyGesture === 'wave' ? -0.55 + wave * 0.7 : talk * 0.8);
+  }
+  if (leftArm) {
+    leftArm.rotation.x = base('LeftUpperArm').x - excited * 0.5;
+    leftArm.rotation.z = base('LeftUpperArm').z - excited * 0.7 - comfort;
+  }
+  if (leftElbow) leftElbow.rotation.z = base('LeftLowerArm').z + (lusyGesture === 'enthusiasm' ? -0.18 : comfort * 0.5);
+}
+
+function cleanLusyResponse(rawText) {
+  let text = String(rawText || '').trim();
+  let detectedMood = null;
+  const actionPattern = /(?:\*\*|\*|_|\[|\()\s*(sonríe|sonrie|se ríe|se rie|ríe|rie|suspira|parpadea|guiña|guina|inclina la cabeza|asiente|niega con la cabeza|saluda con la mano|levanta la mano|se encoge de hombros|se sorprende|sorprendida|sorprendido|se emociona|se entristece|hace una pausa|mira a cámara|mira a camara|gesticula|mueve la cabeza|cruza los brazos|se sonroja)[^\])_*]*?(?:\*\*|\*|_|\]|\))/gi;
+  text = text.replace(actionPattern, match => {
+    const m = match.toLowerCase();
+    detectedMood = /ríe|rie|sonrí|sonrie|emocion/.test(m) ? 'happy' : /sorprend/.test(m) ? 'curious' : /entriste|suspira/.test(m) ? 'sad' : /saluda|mano/.test(m) ? 'greeting' : 'curious';
+    return ' ';
+  });
+  text = text.replace(/^\s*(?:\*[^
+*]+\*|\([^\n)]{1,100}\)|\[[^\n\]]{1,100}\])\s*/gm, ' ');
+  if (lusyCurrentReplySource === 'twitch') {
+    text = text.replace(/^\s*(?:hola|saludos|buenas)[, ]+(?:a todos|a todas|chicos|chicas|gente|chat|comunidad)[^.!?]*[.!?]?\s*/i, '');
+    text = text.replace(/^\s*(?:bienvenidos|bienvenidas)\s+(?:al|a la)\s+[^.!?]*[.!?]?\s*/i, '');
+    text = text.replace(/^\s*gracias por acompañarnos[^.!?]*[.!?]?\s*/i, '');
+  }
+  text = text.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return { text, mood: detectedMood || detectLusyMood(text) };
 }
 
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -4341,17 +4372,13 @@ async function testBrowserTTS() {
 }
 
 // Enhanced AI Response Handler
-async function enhancedSpeakAIResponse(text) {
-  // Show speech bubble with AI response
+async function enhancedSpeakAIResponse(rawText) {
+  const cleaned = cleanLusyResponse(rawText);
+  const text = cleaned.text || 'No tengo nada más que agregar por ahora.';
   showSpeechBubble(text);
-  startLusySpeechAnimation(text);
-
-  // Add AI response to the chat overlay
+  startLusySpeechAnimation(text, cleaned.mood);
   addTwitchChatMessage(characterName, text);
-  
-  // Update status
   updateStatus('🔊', 'AI is speaking...');
-  
   try {
     await speakAIResponse(text);
   } finally {
@@ -5287,23 +5314,15 @@ function getAIContextualChoice() {
 
 function processQueuedMessage(queueItem) {
   let contextualPrompt = '';
-  
-  // Add context about the message source
+  lusyCurrentReplySource = queueItem.source || 'local';
   if (queueItem.source === 'twitch') {
-    if (queueItem.username === 'Multiple Users') {
-      contextualPrompt = queueItem.message;
-    } else {
-      contextualPrompt = `[Twitch Chat] ${queueItem.username}: ${queueItem.message}`;
-    }
-    contextualPrompt += '\n\n[Live-stream behavior: respond directly to the supplied viewer message. Do not use a canned greeting, generic welcome, or channel introduction. Be brief, natural, and varied.]';
+    contextualPrompt = queueItem.username === 'Multiple Users'
+      ? queueItem.message
+      : '[Mensaje individual de Twitch de ' + queueItem.username + ']: ' + queueItem.message;
+    contextualPrompt += '\n\nResponde solo si hay algo concreto que contestar. Si respondes, habla con una persona específica; no saludes al grupo, no presentes el canal y no agradezcas a toda la audiencia. No añadas introducciones.';
   } else {
-    contextualPrompt = `[${userName}]: ${queueItem.message}`;
+    contextualPrompt = '[' + userName + ']: ' + queueItem.message;
   }
-  
-  // Keep every reply focused on the actual message source.
-  // Do not add cross-audience acknowledgements or queue-status instructions.
-
-  // Send to AI directly to avoid infinite loop
   sendMessageToAIInternal(contextualPrompt);
 }
 
