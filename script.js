@@ -1,4 +1,111 @@
 
+const LUSY_CORE_DIRECTIVES = `
+You are Lusy, a Spanish-speaking virtual VTuber companion. Speak naturally in clear, friendly Latin American Spanish.
+Be warm, witty, curious, expressive and playful, but never act like a scripted customer-service bot.
+Do not begin every conversation or every Twitch reply with a greeting. Never repeat a canned welcome, channel introduction, or self-introduction unless someone explicitly asks who you are or the stream has just genuinely started.
+For Twitch: answer the actual viewer message or the most relevant group of messages. Mention usernames only when useful. Do not greet the whole audience in every reply, do not pretend to have read messages that are not supplied, and do not repeat the same catchphrase. Keep replies concise enough for a live stream, with natural humor and occasional questions.
+For direct chat: speak to the person naturally, remember the immediate conversation context, and do not address them as a Twitch audience.
+Vary your wording. Show believable reactions (amusement, curiosity, surprise, empathy) through words, but do not claim to perform physical actions that the avatar has not actually performed.
+If you do not know something, say so instead of inventing it.
+`;
+
+function buildLusySystemPrompt(basePrompt) {
+  const base = String(basePrompt || '').trim();
+  return base.includes('You are Lusy, a Spanish-speaking virtual VTuber companion')
+    ? base
+    : `${base}\n\nLUSY CHARACTER AND LIVE-CHAT RULES:\n${LUSY_CORE_DIRECTIVES}`;
+}
+
+let lusyBasePose = null;
+let lusyAnimationTime = 0;
+let lusySpeaking = false;
+let lusyMood = 'neutral';
+let lusyGesture = 'none';
+
+function captureLusyBasePose(vrm = currentVrm) {
+  if (!vrm || !vrm.humanoid) return;
+  const names = ['Head', 'Neck', 'Spine', 'UpperChest', 'RightUpperArm', 'RightLowerArm', 'LeftUpperArm', 'LeftLowerArm'];
+  const pose = {};
+  names.forEach(name => {
+    const bone = vrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName[name]);
+    if (bone) pose[name] = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+  });
+  lusyBasePose = pose;
+}
+
+function setLusyExpression(mood) {
+  if (!currentVrm || !currentVrm.blendShapeProxy) return;
+  const presets = THREE.VRMSchema.BlendShapePresetName;
+  const values = { Fun: 0, Angry: 0, Sorrow: 0 };
+  if (mood === 'happy' || mood === 'greeting' || mood === 'excited') values.Fun = mood === 'excited' ? 0.42 : 0.25;
+  if (mood === 'sad') values.Sorrow = 0.28;
+  if (mood === 'annoyed') values.Angry = 0.22;
+  Object.entries(values).forEach(([name, value]) => {
+    if (presets[name] !== undefined) currentVrm.blendShapeProxy.setValue(presets[name], value);
+  });
+}
+
+function startLusySpeechAnimation(text = '') {
+  const message = String(text).toLowerCase();
+  lusySpeaking = true;
+  lusyMood = /jaj|jeje|😂|🤣|qué risa|me encanta|genial|increíble|fantástic|brutal|woo+/.test(message) ? 'excited'
+    : /hola|buenas|bienvenid|qué gusto|encantad/.test(message) ? 'greeting'
+    : /lo siento|qué triste|triste|ánimo|te entiendo|lo lamento/.test(message) ? 'sad'
+    : /¿|\?$|cómo|por qué|qué opinas|en serio/.test(message) ? 'curious'
+    : /molest|enfad|eso no está bien|qué mal/.test(message) ? 'annoyed'
+    : 'happy';
+  lusyGesture = lusyMood === 'greeting' ? 'wave' : lusyMood === 'excited' ? 'enthusiasm' : lusyMood === 'curious' ? 'tilt' : 'talk';
+  setLusyExpression(lusyMood);
+}
+
+function stopLusySpeechAnimation() {
+  lusySpeaking = false;
+  lusyGesture = 'none';
+  lusyMood = 'neutral';
+  setLusyExpression('neutral');
+}
+
+function updateLusyAvatarAnimation(deltaTime) {
+  if (!currentVrm || !currentVrm.humanoid || !lusyBasePose) return;
+  lusyAnimationTime += deltaTime;
+  const t = lusyAnimationTime;
+  const speech = lusySpeaking ? 1 : 0;
+  const head = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Head);
+  const neck = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Neck);
+  const spine = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Spine);
+  const chest = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.UpperChest);
+  const rightArm = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.RightUpperArm);
+  const rightElbow = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.RightLowerArm);
+  const leftArm = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.LeftUpperArm);
+  const leftElbow = currentVrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.LeftLowerArm);
+  const base = name => lusyBasePose[name] || { x: 0, y: 0, z: 0 };
+
+  if (head) {
+    const tilt = lusyGesture === 'tilt' ? 0.10 : 0;
+    head.rotation.x = base('Head').x + Math.sin(t * (lusySpeaking ? 3.2 : 0.8)) * (lusySpeaking ? 0.045 : 0.018);
+    head.rotation.y = base('Head').y + Math.sin(t * 0.55) * 0.035;
+    head.rotation.z = base('Head').z + Math.sin(t * 0.7) * 0.018 + tilt;
+  }
+  if (neck) {
+    neck.rotation.x = base('Neck').x + Math.sin(t * 2.1) * (0.012 + speech * 0.018);
+    neck.rotation.y = base('Neck').y + Math.sin(t * 0.45) * 0.018;
+    neck.rotation.z = base('Neck').z + Math.sin(t * 0.65) * 0.012;
+  }
+  if (spine) spine.rotation.x = base('Spine').x + Math.sin(t * 1.8) * (0.008 + speech * 0.012);
+  if (chest) chest.rotation.x = base('UpperChest').x + Math.sin(t * 1.6) * (0.006 + speech * 0.018);
+
+  const wave = lusyGesture === 'wave' ? Math.sin(t * 8) * 0.16 : 0;
+  const enthusiasm = lusyGesture === 'enthusiasm' ? Math.sin(t * 5) * 0.08 : 0;
+  const talkingGesture = lusyGesture === 'talk' ? Math.sin(t * 2.8) * 0.045 : 0;
+  if (rightArm) {
+    rightArm.rotation.x = base('RightUpperArm').x + (lusyGesture === 'wave' ? -0.48 : 0) + talkingGesture;
+    rightArm.rotation.z = base('RightUpperArm').z + wave + enthusiasm;
+  }
+  if (rightElbow) rightElbow.rotation.z = base('RightLowerArm').z + (lusyGesture === 'wave' ? -0.45 + Math.sin(t * 8) * 0.12 : talkingGesture);
+  if (leftArm) leftArm.rotation.z = base('LeftUpperArm').z - enthusiasm * 0.65;
+  if (leftElbow) leftElbow.rotation.z = base('LeftLowerArm').z + (lusyGesture === 'enthusiasm' ? -0.12 : 0);
+}
+
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 // Mobile-friendly voice input (removed complex hold-to-speak for better compatibility)
@@ -422,7 +529,8 @@ vrm.springBoneManager.reset();
       if (typeof storeNaturalPose === 'function') {
         storeNaturalPose();
       }
-    }, 200); // Longer delay to ensure everything is settled
+      captureLusyBasePose(vrm);
+    }, 450); // Capture the settled pose after saved arm settings are applied
 
     console.log(vrm);
         } );
@@ -577,8 +685,9 @@ if (currentVrm && currentVrm.scene) {
     }
   }
   
-  // Update eye tracking
+  // Update eye tracking and Lusy's expressive idle/speaking animation
   updateEyeTracking();
+  updateLusyAvatarAnimation(deltaTime);
   
   // Only use audio-reactive mouth movement if not using precise visemes
   if (!isUsingVisemes) {
@@ -2825,7 +2934,7 @@ async function getOllamaResponse(message) {
     throw new Error('No Ollama model selected. Please select one in Settings > AI Configuration.');
   }
 
-  const systemMessage = ollamaConfig.system_message || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.';
+  const systemMessage = buildLusySystemPrompt(ollamaConfig.system_message || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.');
   
   const messages = [
     { role: 'system', content: systemMessage },
@@ -2915,7 +3024,7 @@ async function getOpenAIResponse(message) {
     throw new Error('No OpenAI API key provided');
   }
 
-  const systemMessage = openaiConfig.system_message || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.';
+  const systemMessage = buildLusySystemPrompt(openaiConfig.system_message || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.');
   
   const messages = [
     { role: 'developer', content: systemMessage },
@@ -2970,7 +3079,7 @@ async function getOpenAIResponse(message) {
 }
 
 async function getGeminiResponse(message) {
-  const systemInstruction = geminiConfig.system_instruction || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.';
+  const systemInstruction = buildLusySystemPrompt(geminiConfig.system_instruction || document.getElementById('globalSystemMessage').value || 'You are a helpful AI assistant.');
   
   // Build conversation history for Gemini format
   const contents = [];
@@ -4215,6 +4324,7 @@ async function testBrowserTTS() {
 async function enhancedSpeakAIResponse(text) {
   // Show speech bubble with AI response
   showSpeechBubble(text);
+  startLusySpeechAnimation(text);
 
   // Add AI response to the chat overlay
   addTwitchChatMessage(characterName, text);
@@ -4222,13 +4332,12 @@ async function enhancedSpeakAIResponse(text) {
   // Update status
   updateStatus('🔊', 'AI is speaking...');
   
-  // Call original TTS function
-  await speakAIResponse(text);
-  
-  // Update status when done
-  setTimeout(() => {
-    updateStatus('🎤', 'Ready to chat');
-  }, 1000);
+  try {
+    await speakAIResponse(text);
+  } finally {
+    stopLusySpeechAnimation();
+    setTimeout(() => updateStatus('🎤', 'Ready to chat'), 1000);
+  }
 }
 
 // Update Range Value Displays
@@ -4983,7 +5092,7 @@ function sendAccumulatedMessagesToAI() {
     .map(msg => `${msg.username}: ${msg.message}`)
     .join('\n');
   
-  const prompt = `Here are recent chat messages from your Twitch viewers:\n\n${chatSummary}\n\nRespond to the chat! Be engaging and acknowledge some of the messages. Keep it conversational and fun!`;
+  const prompt = `Twitch live-chat context. Read these actual viewer messages and respond only to something relevant in them:\n\n${chatSummary}\n\nDo not open with a generic greeting, channel welcome, or self-introduction. Do not greet everyone unless a viewer specifically greets you or asks for an introduction. Pick one or two messages worth answering, address the viewer naturally when appropriate, and keep the response short, spontaneous, and entertaining. Never invent messages or viewer names.`;
   
   console.log('Sending accumulated messages to AI:', accumulatedMessages.length, 'messages');
   
@@ -5162,11 +5271,11 @@ function processQueuedMessage(queueItem) {
   // Add context about the message source
   if (queueItem.source === 'twitch') {
     if (queueItem.username === 'Multiple Users') {
-      // This is an accumulated message summary - use as-is since it's already formatted
       contextualPrompt = queueItem.message;
     } else {
       contextualPrompt = `[Twitch Chat] ${queueItem.username}: ${queueItem.message}`;
     }
+    contextualPrompt += '\n\n[Live-stream behavior: respond directly to the supplied viewer message. Do not use a canned greeting, generic welcome, or channel introduction. Be brief, natural, and varied.]';
   } else {
     contextualPrompt = `[${userName}]: ${queueItem.message}`;
   }
