@@ -92,6 +92,17 @@ body::before {
 }
 
 /* Canvas Container */
+
+/* Lusy's welcoming built-in room background.
+   Custom backgrounds uploaded in Settings remain layered in the 3D scene above this fallback. */
+#canvas-container {
+    background-color: #c9d9f2;
+    background-image: url('assets/lusy-cozy-room.svg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+}
+
 #canvas-container {
     position: absolute;
     top: 0;
