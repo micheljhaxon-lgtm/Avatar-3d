@@ -95,8 +95,7 @@ async function tryGemini(body, env) {
 
   if (!response.ok) {
     const detail = await response.text();
-    const error = new Error(`Gemini returned HTTP ${response.status}: ${detail.slice(0, 500)}`);
-    error.status = response.status;
+    const error = Object.assign(new Error(`Gemini returned HTTP ${response.status}: ${detail.slice(0, 500)}`), { status: response.status });
     throw error;
   }
 
@@ -154,8 +153,7 @@ async function tryOpenRouter(messages, body, env) {
 
   if (!response.ok) {
     const detail = await response.text();
-    const error = new Error(`OpenRouter returned HTTP ${response.status}: ${detail.slice(0, 500)}`);
-    error.status = response.status;
+    const error = Object.assign(new Error(`OpenRouter returned HTTP ${response.status}: ${detail.slice(0, 500)}`), { status: response.status });
     throw error;
   }
 
