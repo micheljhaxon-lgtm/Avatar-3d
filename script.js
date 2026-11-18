@@ -3159,53 +3159,46 @@ async function getGeminiResponse(message) {
     }
   };
 
-  // Retry temporary Cloudflare/Gemini availability errors with backoff.
-  // The API key remains protected in the Cloudflare Worker.
-  const maxAttempts = 3;
-  let response = null;
-  let lastErrorText = '';
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const { signal, cleanup } = createAPITimeoutController();
-
-    try {
-      response = await fetch(GEMINI_WORKER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody),
-        signal
-      });
-    } catch (error) {
-      lastErrorText = error && error.message ? error.message : String(error);
-      if (attempt === maxAttempts) {
-        throw new Error('No se pudo conectar con el servicio de IA después de 3 intentos. ' + lastErrorText);
-      }
-      await new Promise(resolve => setTimeout(resolve, 700 * attempt));
-      continue;
-    } finally {
-      cleanup();
-    }
-
-    if (response.ok) break;
-
-    lastErrorText = await response.text();
-    const temporaryError = [408, 425, 429, 500, 502, 503, 504].includes(response.status);
-
-    if (!temporaryError || attempt === maxAttempts) {
-      if (response.status === 503 || response.status === 429) {
-        throw new Error('Gemini está temporalmente saturado. Se realizaron 3 intentos sin éxito. Espera unos segundos y vuelve a intentarlo.');
-      }
-      throw new Error(`Gemini API error: ${response.status} - ${lastErrorText}`);
-    }
-
-    console.warn(`Gemini temporal error ${response.status}. Retry ${attempt + 1}/${maxAttempts}...`);
-    await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+  // The Cloudflare Worker already performs provider failover (Gemini -> Workers AI -> OpenRouter).
+  // Do not retry the entire gateway here: that would repeat all providers and hide the real failure.
+  const { signal, cleanup } = createAPITimeoutController();
+  let response;
+  try {
+    response = await fetch(GEMINI_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal
+    });
+  } catch (error) {
+    throw new Error('No se pudo conectar con el gateway de Lusy (Cloudflare). Comprueba la conexión e inténtalo de nuevo. ' + (error?.message || String(error)));
+  } finally {
+    cleanup();
   }
 
-  if (!response || !response.ok) {
-    throw new Error('El servicio de IA no está disponible temporalmente. Inténtalo de nuevo.');
+  if (!response.ok) {
+    let errorData = null;
+    let errorText = '';
+    try {
+      errorText = await response.text();
+      errorData = errorText ? JSON.parse(errorText) : null;
+    } catch {
+      errorData = null;
+    }
+
+    const providerDetails = Array.isArray(errorData?.providers)
+      ? errorData.providers.map(item => {
+          const label = item.provider === 'gemini' ? 'Gemini'
+            : item.provider === 'cloudflare-workers-ai' ? 'Cloudflare AI'
+            : item.provider === 'openrouter' ? 'OpenRouter' : item.provider;
+          return label + ': ' + (item.status ? 'HTTP ' + item.status + ' — ' : '') + (item.message || 'sin detalle');
+        }).join(' | ')
+      : '';
+
+    if (providerDetails) {
+      throw new Error('Lusy intentó cambiar automáticamente de proveedor, pero ninguno respondió. ' + providerDetails);
+    }
+    throw new Error('El gateway de Lusy respondió con HTTP ' + response.status + '. ' + (errorData?.error || errorText || 'Error sin detalles.'));
   }
 
   const data = await response.json();
