@@ -19,7 +19,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://micheljhaxon-lgtm.github.io"
 ]);
 
-const CLOUDFLARE_MODEL = "@cf/zai-org/glm-4.7-flash";
+const CLOUDFLARE_MODEL = "@cf/zai-org/glm-5.3";
 const OPENROUTER_MODEL = "openrouter/free";
 
 function corsHeaders(origin) {
@@ -202,11 +202,8 @@ export default {
       return jsonResponse(await tryGemini(body, env), 200, origin);
     } catch (error) {
       failures.push({ provider: "gemini", status: error.status || null, message: error.message });
-      if (error.status && !isTemporaryStatus(error.status)) {
-        // Configuration, authentication, invalid-model and safety errors should not
-        // silently switch providers; report them so the owner can correct the cause.
-        return jsonResponse({ error: error.message, provider: "gemini", fallbackSkipped: true }, error.status, origin);
-      }
+      // Try the backup providers even when Gemini has a configuration, authentication,
+      // quota, model, or safety error. The user asked for resilient provider fallback.
     }
 
     try {
@@ -225,7 +222,8 @@ export default {
       error: "Los tres proveedores de IA no están disponibles. Inténtalo de nuevo en unos segundos.",
       providers: failures.map(item => ({
         provider: item.provider,
-        status: item.status
+        status: item.status,
+        message: String(item.message || "Unknown provider error").slice(0, 240)
       }))
     }, 503, origin);
   }
