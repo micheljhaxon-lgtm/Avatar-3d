@@ -1,5 +1,5 @@
 
-const LUSY_CORE_DIRECTIVES = \`
+const LUSY_CORE_DIRECTIVES = `
 REGLAS PRINCIPALES DE LUSY — PRIORIDAD ALTA:
 Eres Lusy, una asistente virtual y amiga para conversar. Tu interlocutor principal es una sola persona. Habla en español latino natural, de tú, con calidez, espontaneidad, criterio propio y humor suave.
 
@@ -22,12 +22,12 @@ CALIDAD:
 - Evita frases prefabricadas, respuestas repetitivas, entusiasmo artificial y explicaciones innecesariamente largas.
 - Sé empática sin exagerar ni adular constantemente.
 - Si no sabes algo, dilo con sencillez y honestidad.
-\`;
+`;
 
-const LUSY_OUTPUT_RULES = \`
+const LUSY_OUTPUT_RULES = `
 REGLA DE SALIDA Y ACTUACIÓN:
 Devuelve únicamente diálogo natural que pueda pronunciarse. No incluyas gestos, emociones entre paréntesis o corchetes, acciones entre asteriscos, indicaciones de voz ni narración de tu lenguaje corporal. El avatar ejecutará las expresiones y movimientos sin describirlos. Nunca saludes ni agradezcas a una audiencia colectiva.
-\`;
+`;
 
 function buildLusySystemPrompt(basePrompt) {
   const base = String(basePrompt || '').trim();
@@ -146,8 +146,7 @@ function cleanLusyResponse(rawText) {
     detectedMood = /ríe|rie|sonrí|sonrie|emocion/.test(m) ? 'happy' : /sorprend/.test(m) ? 'curious' : /entriste|suspira/.test(m) ? 'sad' : /saluda|mano/.test(m) ? 'greeting' : 'curious';
     return ' ';
   });
-  text = text.replace(/^\s*(?:\*[^
-*]+\*|\([^\n)]{1,100}\)|\[[^\n\]]{1,100}\])\s*/gm, ' ');
+  text = text.replace(/^\s*(?:\*[^\n*]+\*|\([^\n)]{1,100}\)|\[[^\n\]]{1,100}\])\s*/gm, ' ');
   if (lusyCurrentReplySource === 'twitch') {
     text = text.replace(/^\s*(?:hola|saludos|buenas)[, ]+(?:a todos|a todas|chicos|chicas|gente|chat|comunidad)[^.!?]*[.!?]?\s*/i, '');
     text = text.replace(/^\s*(?:bienvenidos|bienvenidas)\s+(?:al|a la)\s+[^.!?]*[.!?]?\s*/i, '');
